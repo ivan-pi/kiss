@@ -48,31 +48,9 @@ contains
 
     contains
 
-        subroutine matvec_dense(n,x,y)
-            integer, intent(in) :: n
-            real(wp), intent(in) :: x(n)
-            real(wp), intent(out) :: y(n)
-#if USE_BLAS
-            external :: dgemv
-            real(dp), parameter :: alpha = 1.0_dp, beta = 0.0_dp
-            call dgemv('N',n,n,alpha,A,size(A,1),x,1,beta,y,1)
-#else
-            y = matmul(A, x)
-#endif
-        end subroutine
+#include "matvec_dense.fi"
+#include "rmatvec_dense.fi"
 
-        subroutine rmatvec_dense(n,x,y)
-            integer, intent(in) :: n
-            real(wp), intent(in) :: x(n)
-            real(wp), intent(out) :: y(n)
-#if USE_BLAS
-            external :: dgemv
-            real(dp), parameter :: alpha = 1.0_dp, beta = 0.0_dp
-            call dgemv('T',n,n,alpha,A,size(A,1),x,1,beta,y,1)
-#else
-            y = matmul(transpose(A), x)
-#endif
-        end subroutine
     end subroutine
 
 
