@@ -2,6 +2,53 @@ submodule (kiss) bicgstab
 
 contains
 
+    module subroutine bicgstab_linop(A,b,x,rtol,atol,maxiter,callback,info)
+        class(kiss_linop), intent(in) :: A
+        real(wp), intent(in) :: b(:)
+        real(wp), intent(inout) :: x(:)
+        real(wp), intent(in), optional :: rtol, atol
+        integer, intent(in), optional :: maxiter
+        procedure(it_callback), optional :: callback
+        integer, intent(out), optional :: info
+
+        integer :: info_, maxiter_, n
+#ifdef __INTEL_COMPILER
+        type(bicgstab_workspace(n=:)), allocatable :: it
+#else
+        type(bicgstab_workspace) :: it
+#endif
+        n = size(x)
+
+#ifdef __INTEL_COMPILER
+        allocate ( bicgstab_workspace(n=n) :: it)
+#else
+        it%n = n
+        allocate(it%x0(n), it%r(n), it%p(n), it%v(n))
+        allocate(it%rtilde(n), it%s(n), it%phat(n), it%shat(n), it%t(n))
+#endif
+        it%matvec => matvec
+
+        maxiter_ = 10*n
+
+        if (present(rtol)) it%rtol = rtol
+        if (present(atol)) it%atol = atol
+        if (present(maxiter)) maxiter_ = maxiter
+
+        call bicgstab_wrk(it,b,x,maxiter_,info_,callback)
+
+        if (present(info)) info = info_
+
+    contains
+
+        subroutine matvec(n,x,y)
+            integer, intent(in) :: n
+            real(wp), intent(in) :: x(n)
+            real(wp), intent(out) :: y(n)
+            call A%apply(x,y)
+        end subroutine
+
+    end subroutine
+
     module subroutine bicgstab_dense(A,b,x,rtol,atol,maxiter,callback,info)
         real(wp), intent(in) :: A(:,:)
         real(wp), intent(in) :: b(:)
