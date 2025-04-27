@@ -71,8 +71,12 @@ module kiss
     public :: bicgstab_dense
     public :: cg_dense
     public :: cgs_dense
+    public :: gmres_dense
     public :: qmr_dense
     public :: tfqmr_dense
+
+    public :: kiss_linop
+    public :: bicgstab_linop
 
     ! public callback
     abstract interface
@@ -82,6 +86,34 @@ module kiss
         end subroutine
     end interface
 
+    type, abstract :: kiss_linop
+        integer :: n
+    contains
+        procedure(apply_fun), deferred :: apply
+    end type
+
+    abstract interface
+        subroutine apply_fun(op,x,y)
+            import kiss_linop, wp
+            class(kiss_linop), intent(in) :: op
+            real(wp), intent(in) :: x(op%n)
+            real(wp), intent(out) :: y(op%n)
+        end subroutine
+    end interface
+
+    interface
+        module subroutine bicgstab_linop(A,b,x,rtol,atol,maxiter,callback,info)
+            class(kiss_linop), intent(in) :: A
+            real(wp), intent(in) :: b(:)
+            real(wp), intent(inout) :: x(:)
+            real(wp), intent(in), optional :: rtol, atol
+            integer, intent(in), optional :: maxiter
+            procedure(it_callback), optional :: callback
+            integer, intent(out), optional :: info
+        end subroutine
+    end interface
+
+    ! Dense methods
     interface
         module subroutine bicgstab_dense(A,b,x,rtol,atol,maxiter,callback,info)
             real(wp), intent(in) :: A(:,:)
@@ -116,6 +148,15 @@ module kiss
             real(wp), intent(inout) :: x(:)
             real(wp), intent(in), optional :: rtol, atol
             integer, intent(in), optional :: maxiter
+            procedure(it_callback), optional :: callback
+            integer, intent(out), optional :: info
+        end subroutine
+        module subroutine gmres_dense(A,b,x,rtol,atol,maxiter,restart,callback,info)
+            real(wp), intent(in) :: A(:,:)
+            real(wp), intent(in) :: b(:)
+            real(wp), intent(inout) :: x(:)
+            real(wp), intent(in), optional :: rtol, atol
+            integer, intent(in), optional :: maxiter, restart
             procedure(it_callback), optional :: callback
             integer, intent(out), optional :: info
         end subroutine

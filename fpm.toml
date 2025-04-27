@@ -10,8 +10,11 @@ auto-executables = true
 auto-tests = true
 auto-examples = true
 module-naming = false
+link = ["blas", "lapack"]
 
 [install]
 library = false
 
 
+[dev-dependencies]
+fortuno = { git = "https://github.com/fortuno-repos/fortuno-fpm-serial.git" }

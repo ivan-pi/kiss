@@ -7,6 +7,9 @@
 !
 ! Only double precision is available.
 !
+
+#ifdef __INTEL_COMPILER
+
 module kiss_mkl
 implicit none
 private
@@ -256,3 +259,5 @@ contains
     ! end function
 
 end module kiss_mkl
+
+#endif

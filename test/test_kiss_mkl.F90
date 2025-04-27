@@ -1,3 +1,6 @@
+
+#ifdef __INTEL_COMPILER
+
 module kiss_mkl_tests
 
     use kiss_mkl
@@ -97,7 +100,7 @@ contains
     end subroutine
 end module
 
-program test_bicgstab
+program test_kiss_mkl
 
     use kiss_mkl_tests
     implicit none
@@ -106,3 +109,11 @@ program test_bicgstab
     call fgmres_test
 
 end program
+
+#else
+
+program test_kiss_mkl
+print *, "test_kiss_mkl is currently only enabled by the Intel Fortran compiler"
+end program
+
+#endif
