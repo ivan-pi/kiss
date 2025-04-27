@@ -76,7 +76,9 @@ module kiss
     public :: tfqmr_dense
 
     public :: kiss_linop
+
     public :: bicgstab_linop
+    public :: cg_linop
 
     ! public callback
     abstract interface
@@ -102,6 +104,15 @@ module kiss
     end interface
 
     interface
+        module subroutine cg_linop(A,b,x,rtol,atol,maxiter,callback,info)
+            class(kiss_linop), intent(in) :: A
+            real(wp), intent(in) :: b(:)
+            real(wp), intent(inout) :: x(:)
+            real(wp), intent(in), optional :: rtol, atol
+            integer, intent(in), optional :: maxiter
+            procedure(it_callback), optional :: callback
+            integer, intent(out), optional :: info
+        end subroutine
         module subroutine bicgstab_linop(A,b,x,rtol,atol,maxiter,callback,info)
             class(kiss_linop), intent(in) :: A
             real(wp), intent(in) :: b(:)

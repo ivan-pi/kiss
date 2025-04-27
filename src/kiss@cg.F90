@@ -2,6 +2,53 @@ submodule (kiss) cg
 
 contains
 
+    module subroutine cg_linop(A,b,x,rtol,atol,maxiter,callback,info)
+        class(kiss_linop), intent(in) :: A
+        real(wp), intent(in) :: b(:)
+        real(wp), intent(inout) :: x(:)
+        real(wp), intent(in), optional :: rtol, atol
+        integer, intent(in), optional :: maxiter
+        procedure(it_callback), optional :: callback
+        integer, intent(out), optional :: info
+
+        integer :: info_, maxiter_, n
+#ifdef __INTEL_COMPILER
+        type(cg_workspace(n=:)), allocatable :: it
+#else
+        type(cg_workspace) :: it
+#endif
+
+        n = size(x)
+
+#ifdef __INTEL_COMPILER
+        allocate ( cg_workspace(n=n) :: it)
+#else
+        it%n = n
+        allocate(it%r(n), it%p(n), it%z(n), it%q(n))
+#endif
+        it%matvec => matvec_linop
+
+        maxiter_ = 10*n
+
+        if (present(rtol)) it%rtol = rtol
+        if (present(atol)) it%atol = atol
+        if (present(maxiter)) maxiter_ = maxiter
+
+        call cg_wrk(it,b,x,maxiter_,info_,callback)
+
+        if (present(info)) info = info_
+
+    contains
+
+        subroutine matvec_linop(n,x,y)
+            integer, intent(in) :: n
+            real(wp), intent(in) :: x(n)
+            real(wp), intent(out) :: y(n)
+            call A%apply(x,y)
+        end subroutine
+
+    end subroutine
+
     module subroutine cg_dense(A,b,x,rtol,atol,maxiter,callback,info)
         real(wp), intent(in) :: A(:,:)
         real(wp), intent(in) :: b(:)
