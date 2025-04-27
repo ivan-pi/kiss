@@ -16,6 +16,13 @@ module heat2d
     procedure :: apply => apply_stencil
   end type
 
+  type, extends(kiss_linop) :: jacobi_pc_op
+    integer :: Nx, Ny
+    real(dp) :: dx, dy, coeff
+  contains
+    procedure :: apply => apply_jacobi
+  end type
+
 contains
 
   subroutine apply_stencil(op,x,y)
@@ -53,6 +60,56 @@ contains
 
   end subroutine
 
+  ! Jacobi preconditioner for the (I + coef *Laplacian) operator
+  subroutine apply_jacobi(op,x,y)
+      class(jacobi_pc_op), intent(in) :: op
+      real(dp), intent(in) :: x(op%n)
+      real(dp), intent(out) :: y(op%n)
+
+      real(dp) :: invm, m
+      integer :: i, j
+
+      m = 1 - op%coeff * (-2.0_dp/op%dx**2 - 2.0_dp/op%dy**2)
+      invm = 1.0_dp/m
+
+      do j = 2, op%Ny-1
+        do i = 2, op%Nx-1
+          y((j-1)*op%Nx + i) = invm * x((j-1)*op%Nx + i)
+        end do
+      end do
+
+  end subroutine
+
+
+  ! Reaction-diffusion stencil in a hollow cylindrical catalyst
+  !
+  ! This problem is taken from a former university assignment
+  ! under supervision of Prof. Janez Levec.
+  !
+  subroutine apply_crd(Ru,u,r,dr,dy,k,De,Nr,Ny)
+    integer, intent(in) :: Nr, Ny
+    real(dp), intent(in) :: r(Nr), dr, dy, k, De
+    real(dp), intent(out) :: Ru(Nr,Ny)
+    real(dp), intent(in) :: u(Nr,Ny)
+
+    real(dp) :: rdr2, rdy2
+    integer :: i, j
+
+    rdr2 = 1.0_dp/dr**2
+    rdy2 = 1.0_dp/dy**2
+
+    do j = 2, Ny-1
+      do i = 2, Nr-1
+        Ru(i,j) = &
+          rdr2*(u(i+1,j) - 2.0_dp*u(i,i) + u(i-1,j)) + &
+          0.5_dp*dr*(u(i+1,j) - u(i-1,2))/r(i) + &
+          rdy2*(u(i,j+1) - 2.0_dp*u(i,i) + u(i,j+1)) - &
+          - (k/De) * u(i,j)
+      end do
+    end do
+
+  end subroutine
+
 end module
 
 program test_heat2d
@@ -68,7 +125,7 @@ program test_heat2d
   integer, parameter :: Nt = 100
   integer, parameter :: N = Nx * Ny
   real(dp), parameter :: Lx = 1.0_dp, Ly = 1.0_dp
-  real(dp), parameter :: alpha = 0.01_dp, dt = 0.001_dp
+  real(dp), parameter :: alpha = 0.01_dp, dt = 0.1_dp
   real(dp), parameter :: tol = 1.0e-8_dp
   integer, parameter :: maxiter = 1000
 
@@ -99,7 +156,7 @@ program test_heat2d
     x = [((i-1)*dx,i=1,Nx)]
     y = [((i-1)*dy,i=1,Ny)]
     open(newunit=unit,file="heat0.txt")
-    call plot_nonuniform_matrix(unit,x,y,&
+    call print_nonuniform_matrix(unit,x,y,&
         reshape(u,shape=[Nx,Ny]))
     close(unit)
   end block
@@ -109,7 +166,7 @@ program test_heat2d
 
   Rcoef = alpha * dt
 
-  num_steps = 10000
+  num_steps = 100
   do step = 0, num_steps
 
 !    call apply_laplacian(&
@@ -119,9 +176,12 @@ program test_heat2d
     call cn_R%apply(u,u_next)
     u = u_next
 
+    print *, "starting cg"
     call cg_linop(A=cn_L,b=u_next,x=u,&
             callback=print_residual_norm,info=info)
-    u = u_next
+    if (info /= 0) error stop "cg did not converge"
+    print *, "cg done"
+    !u = u_next
 
     if (mod(step,1000) == 0) then
       print *, step
@@ -145,7 +205,7 @@ program test_heat2d
     x = [((i-1)*dx,i=1,Nx)]
     y = [((i-1)*dy,i=1,Ny)]
     open(newunit=unit,file="heat_end.txt")
-    call plot_nonuniform_matrix(unit,x,y,&
+    call print_nonuniform_matrix(unit,x,y,&
         reshape(u,shape=[Nx,Ny]))
     close(unit)
   end block
@@ -188,47 +248,79 @@ contains
 
   end subroutine
 
-   subroutine plot_nonuniform_matrix(unit,x,y,z,fmt)
-      integer, intent(in) :: unit
-      real(dp), intent(in) :: x(:), y(:)
-      real(dp), intent(in) :: z(:,:)      ! shape(z) := (NY,NX)
-      character(len=*), intent(in), optional :: fmt
+  ! ASCII output format suitable for gnuplot
+  !
+  ! Plot the resulting data with using
+  !
+  !    plot "data" nonuniform matrix with image
+  !
+  subroutine print_nonuniform_matrix(unit,x,y,z,fmt)
+  integer, intent(in) :: unit
+  real(dp), intent(in) :: x(:), y(:)
+  real(dp), intent(in) :: z(:,:)      ! shape(z) := (NY,NX)
+  character(len=*), intent(in), optional :: fmt
 
-      character(len=32) :: cx, cy
-      character(len=:), allocatable :: fmt1, fmt2, dp_fmt
-      integer :: row
+  character(len=32) :: cx, cy
+  character(len=:), allocatable :: fmt1, fmt2, dp_fmt
+  integer :: row
 
-      if (size(z,1) /= size(y) .or. &
-         size(z,2) /= size(x)) then
-         error stop "[plot_nonuniform_matrix] error: incompatible array dimensions"
-      end if
+  if (size(z,1) /= size(y) .or. &
+  size(z,2) /= size(x)) then
+  error stop "[plot_nonuniform_matrix] error: incompatible array dimensions"
+  end if
 
-      write(cx,'(I0)') size(x)
-      write(cy,'(I0)') size(y)
+  write(cx,'(I0)') size(x)
+  write(cy,'(I0)') size(y)
 
-      dp_fmt = 'G0'
-      if (present(fmt)) then
-         dp_fmt = trim(fmt)
-      end if
+  dp_fmt = 'G0'
+  if (present(fmt)) then
+  dp_fmt = trim(fmt)
+  end if
 
-      fmt1 = '(I0,'//trim(cx)//'(1X,'//dp_FMT//'))'
-      !fmt1 = "(I0,4(1X,G0))"
+  fmt1 = '(I0,'//trim(cx)//'(1X,'//dp_FMT//'))'
+  !fmt1 = "(I0,4(1X,G0))"
 
-      fmt2 = '('//dp_FMT//','//trim(cx)//'(1X,'//dp_FMT//'))'
+  fmt2 = '('//dp_FMT//','//trim(cx)//'(1X,'//dp_FMT//'))'
 
-      print *, fmt1
-      print *, fmt2
+  print *, fmt1
+  print *, fmt2
 
-      write(unit,fmt1) size(x)+1, x
-      do row = 1, size(y)
-         write(unit,fmt2) y(row),z(row,:)
-      end do
+  write(unit,fmt1) size(x)+1, x
+  do row = 1, size(y)
+  write(unit,fmt2) y(row),z(row,:)
+  end do
 
-      ! Add empty line so we can continue plotting if needed
-      write(unit,*)
+  ! Add empty line so we can continue plotting if needed
+  write(unit,*)
 
-      close(unit)
+  close(unit)
 
-   end subroutine
+  end subroutine
+
+
+  ! Legacy VTK format for structured grid
+  !
+  ! Routine is borrowed from the repo of Neil Carlson
+  ! under MIT License:
+  !
+  !    https://github.com/nncarlson/index-map
+  !
+  subroutine vtk_plot(filename)
+    character(len=*), intent(in) :: filename
+    integer :: iunit
+    open(newunit=iunit,file=trim(filename),action="write")
+    write(iunit,'("# vtk DataFile Version 3.0")')
+    write(iunit,'("test_heat2d")')
+    write(iunit,'("ASCII")')
+    write(iunit,'("DATASET STRUCTURED_POINTS")')
+    write(iunit,'("DIMENSIONS",3(1x,i0))') Nx+1, Ny+1, 1
+    write(iunit,'("ORIGIN 0 0 0")')
+    write(iunit,'("SPACING",3(1x,g0))') dx, dy, 1
+    write(iunit,'("POINT_DATA ",i0)') (Nx*Ny)**2
+    write(iunit,'("SCALARS u float 1")')
+    write(iunit,'("LOOKUP_TABLE default")')
+    write(iunit,'(G0)') u
+    close(iunit)
+  end subroutine
 
 end program
