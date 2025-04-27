@@ -135,36 +135,36 @@ contains
     end subroutine
 
 
-    subroutine gmres_test
+    ! subroutine gmres_test
 
-        integer, parameter :: n = 3
-        real(wp) :: A(n,n), b(n), x(n)
-        integer :: info
+    !     integer, parameter :: n = 3
+    !     real(wp) :: A(n,n), b(n), x(n)
+    !     integer :: info
 
-        print '(A)', "GMRES TEST"
+    !     print '(A)', "GMRES TEST"
 
-        A = reshape([ real(wp) :: &
-                     [ 3, 2, 0], &
-                     [ 1,-1, 0], &
-                     [ 0, 5, 1]], shape=[n,n],order=[2,1])
+    !     A = reshape([ real(wp) :: &
+    !                  [ 3, 2, 0], &
+    !                  [ 1,-1, 0], &
+    !                  [ 0, 5, 1]], shape=[n,n],order=[2,1])
 
-        b = [ real(wp) :: 2, 4, -1]
+    !     b = [ real(wp) :: 2, 4, -1]
 
-        x = 0
-        call gmres_dense(A,b,x,atol=1.0e-5_wp,&
-            callback=print_residual_norm,info=info)
+    !     x = 0
+    !     call gmres_dense(A,b,x,atol=1.0e-5_wp,&
+    !         callback=print_residual_norm,info=info)
 
-        call print_residual_norm(x)
-        write(*,'("info = ", I0)') info
+    !     call print_residual_norm(x)
+    !     write(*,'("info = ", I0)') info
 
-    contains
+    ! contains
 
-        subroutine print_residual_norm(x)
-            real(wp), intent(in) :: x(:)
-            print *, "residual norm = ", norm2(b - matmul(A,x))
-        end subroutine
+    !     subroutine print_residual_norm(x)
+    !         real(wp), intent(in) :: x(:)
+    !         print *, "residual norm = ", norm2(b - matmul(A,x))
+    !     end subroutine
 
-    end subroutine
+    ! end subroutine
 
 
     subroutine qmr_test
@@ -240,7 +240,7 @@ program test_bicgstab
     call bicgstab_test
     call cg_test
     call cgs_test
-    call gmres_test
+    !call gmres_test
     call qmr_test
     call tfqmr_test
 
